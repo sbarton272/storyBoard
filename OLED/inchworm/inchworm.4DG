@@ -1,0 +1,101 @@
+#platform "GOLDELOX"
+/*
+ * Spencer Barton, March 2014
+ * Test: Draw a line-inchworm on the uTOLED-20-G2
+ */
+
+#inherit "4DGL_16bitColours.fnc"
+
+// window const
+#CONST
+    WIN_LENGTH 128
+    WIN_HEIGHT 160
+#END
+
+/* inchworm constants
+   Move diagram
+
+    __/\__ -> __/ \__
+
+ */
+#CONST
+    // constant segments
+    REG_HEIGHT      0
+    REG_LENGTH     20
+    // extended segments
+    EXTEND_HEIGHT   14
+    EXTEND_LENGTH   14
+    // compress segments
+    COMPRESS_HEIGHT 18
+    COMPRESS_LENGTH 10
+
+    WORM_CLR GREEN
+    CLEAR BLACK
+#END
+
+// Timing constants
+#CONST
+    COMPRESS_DELAY  50
+    EXTEND_DELAY    50
+#END
+
+/*===================================================
+ * Helper functs
+ *=================================================== */
+
+func drawCompressWorm(var cx, var cy, var clr)
+    // center around cy with cy as base of worm
+
+    // straight lines
+    gfx_Line(cx-COMPRESS_LENGTH-REG_LENGTH, cy, cx-COMPRESS_LENGTH, cy, clr);
+    gfx_Line(cx+COMPRESS_LENGTH, cy, cx+COMPRESS_LENGTH+REG_LENGTH, cy, clr);
+
+    // center segment
+    gfx_Line(cx-COMPRESS_LENGTH, cy, cx, cy+COMPRESS_HEIGHT, clr);
+    gfx_Line(cx, cy+COMPRESS_HEIGHT, cx+COMPRESS_LENGTH, cy, clr);
+
+
+endfunc
+
+func drawExtendedWorm(var cx, var cy, var clr)
+    // center around cy with cy as base of worm
+
+    // straight lines
+    gfx_Line(cx-EXTEND_LENGTH-REG_LENGTH, cy, cx-EXTEND_LENGTH, cy, clr);
+    gfx_Line(cx+EXTEND_LENGTH, cy, cx+EXTEND_LENGTH+REG_LENGTH, cy, clr);
+
+    // center segment
+    gfx_Line(cx-EXTEND_LENGTH, cy, cx, cy+EXTEND_HEIGHT, clr);
+    gfx_Line(cx, cy+EXTEND_HEIGHT, cx+EXTEND_LENGTH, cy, clr);
+
+endfunc
+
+/*===================================================
+ * Main functs
+ *=================================================== */
+
+func setup()
+
+    gfx_ScreenMode(PORTRAIT);
+
+endfunc
+
+func draw()
+
+    repeat
+    //gfx_Cls(); // clear screen
+    drawExtendedWorm(WIN_LENGTH/2, WIN_HEIGHT/2, WORM_CLR);
+    pause(EXTEND_DELAY);
+    drawExtendedWorm(WIN_LENGTH/2, WIN_HEIGHT/2, CLEAR);
+    //gfx_Cls(); // clear screen
+    drawCompressWorm(WIN_LENGTH/2, WIN_HEIGHT/2, WORM_CLR);
+    pause(COMPRESS_DELAY);
+    drawCompressWorm(WIN_LENGTH/2, WIN_HEIGHT/2, CLEAR);
+    forever
+
+endfunc
+
+func main()
+    setup();
+    draw();
+endfunc

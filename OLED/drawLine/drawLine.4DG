@@ -1,9 +1,9 @@
+#platform "GOLDELOX"
+
 /*
  * Spencer Barton, March 2014
  * Test: Draw a line on the uTOLED-20-G2
  */
-
-#platform "GOLDELOX"
 
 #inherit "4DGL_16bitColours.fnc"
 
