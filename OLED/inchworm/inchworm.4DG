@@ -10,7 +10,7 @@
 #CONST
     WIN_LENGTH 160
     WIN_HEIGHT 128
-    WIN_ORIENT LANDSCAPE
+    WIN_ORIENT LANDSCAPE_R
 #END
 
 /* inchworm constants
