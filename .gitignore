@@ -3,4 +3,5 @@
 *.cfg
 *.pdf
 documentation
-serialInchworm/images/*
+OLED/serialInchworm
+CapacitivePlate/3Dexample
