@@ -11,6 +11,8 @@
 // comment out to take out debug mode
 #define SERIAL_DEBUG
 
+#define N_SENSOR_POLLS 100
+
 const int greenPin = 4;
 const int redPin = 3;
 const int bluePin = 2;
@@ -26,6 +28,10 @@ void setup() {
 
 #ifdef SERIAL_DEBUG
     Serial.begin(9600);
+    // handshake
+    while (!Serial.available());
+    char handshake = Serial.read();
+    Serial.println(handshake);
 #endif
 
 }
@@ -35,7 +41,6 @@ void loop() {
 #ifdef SERIAL_DEBUG
     pollSerialDebug();
 #endif
-    Serial.println("---");
 
 }
 
@@ -47,12 +52,13 @@ void loop() {
  *  's' - get light sensor value
  */
 void pollSerialDebug() {
-    byte command = '\0';
+    char command = '\0';
     int colorVal = 0;
+    int i;
 
-    if (Serial.available()) {
-        command = Serial.read();
-    }
+    // hold until serial comes
+    while (!Serial.available());
+    command = Serial.read();
 
     // note low turns on LEDs
     switch (command) {
@@ -75,6 +81,12 @@ void pollSerialDebug() {
         case 's':
             colorVal = analogRead(colorSensePin);
             Serial.println(colorVal);
+            break;
+        case 't':
+            for(i = 0; i < N_SENSOR_POLLS; i++) {
+                /colorVal = analogRead(colorSensePin);
+                //Serial.println(colorVal);
+            }
             break;
         default:
             // write back
