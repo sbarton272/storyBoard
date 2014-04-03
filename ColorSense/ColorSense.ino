@@ -11,8 +11,7 @@
 // comment out to take out debug mode
 #define SERIAL_DEBUG
 
-#define N_SENSOR_POLLS 100
-
+const int N_SENSOR_POLLS = 100;
 const int greenPin = 4;
 const int redPin = 3;
 const int bluePin = 2;
@@ -84,9 +83,10 @@ void pollSerialDebug() {
             break;
         case 't':
             for(i = 0; i < N_SENSOR_POLLS; i++) {
-                /colorVal = analogRead(colorSensePin);
-                //Serial.println(colorVal);
+                colorVal = analogRead(colorSensePin);
+                Serial.println(colorVal);
             }
+            Serial.println("done");
             break;
         default:
             // write back
