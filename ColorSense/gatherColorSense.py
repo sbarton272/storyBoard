@@ -7,7 +7,7 @@ import serial, time
 # ======================================
 
 # data files
-FILENAME = 'data/whiteTest.txt'
+FILENAME = 'data/redTest.txt'
 DELIM = '\t'
 DATA_HEADER = 'LED\tVAL\n'
 

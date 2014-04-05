@@ -2,6 +2,7 @@
 *.4XE
 *.cfg
 *.pdf
+*.asv
 documentation
 OLED/serialInchworm
 CapacitivePlate/3Dexample
