@@ -201,7 +201,7 @@ void pollSerialDebug() {
             Serial.println("done");
             break;
         case 'c':
-            Serial.print("classify: ");
+            Serial.println("classify (r,g,b)c ");
             Serial.println( getCurrentColor() );
             break;
         default:
