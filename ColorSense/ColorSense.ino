@@ -14,34 +14,26 @@
 
 // comment out to take out debug mode
 #define SERIAL_DEBUG
-#define N_CLR_DETECT 4
-#define MAX_DISTANCE 1000 // arbitrary
 
-typedef char classification_t;
+#include "ColorSense.h"
 
-typedef struct {
-    int r;
-    int g;
-    int b;
-    classification_t classification;
-} color_centroid_t;
-
-typedef struct {
-    int r;
-    int g;
-    int b;
-} sensor_vals_t;
-
+// arduino compiler doesn't like #define sometimes
+const int SENSOR_MEASURE_DELAY = 200;
 const int N_SENSOR_POLLS = 100;
-const int greenPin = 4;
+
+
+const int greenPin = 2;
 const int redPin = 3;
-const int bluePin = 2;
+const int bluePin = 4;
 const int colorSensePin = A0;
+// {r,g,b,classification}
+// TODO may need to calibrate every time
+// sensor readings noisy between color changes?
 const color_centroid_t colorCentroids[N_CLR_DETECT] = {
-    {750, 503, 805, 'b'},
-    {728, 388, 737, 'w'},
-    {769, 353, 763, 'r'},
-    {771, 412, 703, 'g'}
+    {292, 720, 711, 'r'},
+    {386, 665, 729, 'g'},
+    {503, 779, 694, 'b'},
+    {330, 656, 662, 'w'}
 };
 
 /* ===========================================
@@ -76,9 +68,10 @@ void loop() {
 
 #ifdef SERIAL_DEBUG
     pollSerialDebug();
-#endif
-
+#else
+    Serial.print("Color: ");
     Serial.println( getCurrentColor() );
+#endif
 
 }
 
@@ -134,14 +127,26 @@ sensor_vals_t getSensorVals() {
     // set given led colors and return sensor values
     sensor_vals_t sensorVals;
 
+    delay(SENSOR_MEASURE_DELAY);
     setLEDs(HIGH, LOW, LOW); // red
+    delay(SENSOR_MEASURE_DELAY);
     sensorVals.r = analogRead(colorSensePin);
+    Serial.println(sensorVals.r);
+    delay(SENSOR_MEASURE_DELAY);
 
     setLEDs(LOW, HIGH, LOW); // green
+    delay(SENSOR_MEASURE_DELAY);
     sensorVals.g = analogRead(colorSensePin);
+    Serial.println(sensorVals.g);
+    delay(SENSOR_MEASURE_DELAY);
 
     setLEDs(LOW, LOW, HIGH); // blue
+    delay(SENSOR_MEASURE_DELAY);
     sensorVals.b = analogRead(colorSensePin);
+    Serial.println(sensorVals.b);
+    delay(SENSOR_MEASURE_DELAY);
+    
+    setLEDs(LOW, LOW, LOW); // off
 
     return sensorVals;
 }
@@ -194,6 +199,10 @@ void pollSerialDebug() {
                 Serial.println(colorVal);
             }
             Serial.println("done");
+            break;
+        case 'c':
+            Serial.print("classify: ");
+            Serial.println( getCurrentColor() );
             break;
         default:
             // write back
