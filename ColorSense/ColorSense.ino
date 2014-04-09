@@ -1,4 +1,4 @@
-/* Color Sensor
+                                                                                                                         /* Color Sensor
  * RGB LED and Photoresistor
  *
  * D2 - Green
