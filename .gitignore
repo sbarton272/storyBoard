@@ -3,6 +3,7 @@
 *.cfg
 *.pdf
 *.asv
+*.pyc
 documentation
 OLED/serialInchworm
 CapacitivePlate/3Dexample
