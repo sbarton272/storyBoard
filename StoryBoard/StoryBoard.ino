@@ -35,6 +35,12 @@ typedef struct {
     byte id;
 } animation_t;
 
+typedef struct {
+    byte[] cmds;
+    int len;
+    bool ack;
+} OLED_cmd_t;
+
 /*====================================================
   Macros
   ====================================================*/
@@ -51,6 +57,9 @@ typedef struct {
 #define SOFT_TX_PIN (3)
 #define OLED_RESET_PIN (4)
 #define OLED_RESET_DELAY (400)
+
+/* OLED Commands and Interface */
+#define OLED_ACK (0x06)
 
 /* Hall sensors */
 #define N_CALIBRATION_SAMPLES (100)
@@ -93,6 +102,16 @@ const animation_t owlCry5 = {
 const animation_t animations[N_ANIMATIONS] = { owlBlink1, owlDazed4, owlCry5 };
 
 /*====================================================
+  OLED
+  ====================================================*/
+
+const OLED_cmd_t clearOLED = {
+    {0xFF, 0xD7},
+    2,
+    true
+};
+
+/*====================================================
   Set-up
   ====================================================*/
 
@@ -111,9 +130,9 @@ void setup() {
     /* OLED Reset */
     pinMode(OLED_RESET_PIN, OUTPUT);
     delay(OLED_RESET_DELAY);
-    digitalWrite(OLED_RESET_PIN, HIGH);
-    delay(OLED_RESET_DELAY);
     digitalWrite(OLED_RESET_PIN, LOW);
+    delay(OLED_RESET_DELAY);
+    digitalWrite(OLED_RESET_PIN, HIGH);
 
     // calibrate hall effect sensor
     calibrateSensor(N_CALIBRATION_SAMPLES, HALL_SENSOR_0);
@@ -187,14 +206,23 @@ int calibrateSensorAverage(int nSamples, int sensorPin) {
 
 void loop() {
     char buf[2] = "A";
+    int id;
 
     magnet_tag_t magnetTag = readMagnetTag();
+    id = idTag(magnetTag);
+    /* if valid id then play animation */
+    if ( (0 <= id) && (id < N_ANIMATIONS) ) {
+        playAnimation
+    } else {
+        clearOLED();
+    }
 
+    /* Debug print */
     printMagnetPolarity(magnetTag.pole0);
     printMagnetPolarity(magnetTag.pole1);
     printMagnetPolarity(magnetTag.pole2);
     Serial.print(' ');
-    Serial.print(idTag(magnetTag));
+    Serial.print(id);
     Serial.print("; ");
 
     OLED.write(0xFF);  //MSB
@@ -203,6 +231,8 @@ void loop() {
     OLED.readBytes(buf, 1);
     Serial.print( buf );
     Serial.println();
+
+
 
 }
 
@@ -269,6 +299,33 @@ magnet_polarity_t readMagnet(int sensorPin) {
     }
 
     return magnetPolarity;
+}
+
+/*====================================================
+  OLED
+  ====================================================*/
+
+bool waitAckOLED() {
+    // TODO this function may block for too long
+    char ack;
+    while( !OLED.available() );
+    OLED.readBytes(&ack, 1);
+    return (OLED_ACK == ack) ;
+}
+
+/* commandOLED sends given command to OLED and returns bool
+ *  to signal success. 
+ */
+bool commandOLED(OLED_cmd_t cmd) {
+
+    for(int i = 0; i < cmd.len; i++) { 
+        OLED.write(cmd.cmds[i]);
+    }
+
+    if (cmd.ack) {
+        return waitAckOLED();
+    }
+    return true;
 }
 
 /*====================================================
