@@ -39,6 +39,7 @@ typedef struct {
     byte[] cmds;
     int len;
     bool ack;
+    bool ackVal;
 } OLED_cmd_t;
 
 /*====================================================
@@ -78,6 +79,60 @@ int sensorThreshold;
 int sensorVariance;
 
 /*====================================================
+  OLED
+  ====================================================*/
+
+const OLED_cmd_t OLED_CLEAR = {
+    {0xFF, 0xD7},
+    2,
+    true,
+    false
+};
+
+const OLED_cmd_t OLED_SS_TIMEOUT = {
+    {0x00, 0x0C, 0x00, 0x00},
+    4,
+    true,
+    false
+};
+
+const OLED_cmd_t OLED_MEDIA_INIT = {
+    {0xFF, 0xB1},
+    2,
+    true,
+    true
+};
+
+const OLED_cmd_t OLED_SET_SECT_0 = {
+    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x00},
+    6,
+    true,
+    false
+};
+
+const OLED_cmd_t OLED_RUN_VIDEO = {
+    {0xFF, 0xBB, 0x00, 0x00, 0x00, 0x00},
+    6,
+    true,
+    false
+};
+
+const OLED_cmd_t OLED_VIDEO_FRAME_0 = {
+    {0xFF, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+    8,
+    true,
+    false
+};
+
+const OLED_cmd_t OLED_VIDEO_FRAME_1 = {
+    {0xFF, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+    8,
+    true,
+    false
+};
+
+
+/*====================================================
   Animations
   ====================================================*/
 
@@ -100,16 +155,6 @@ const animation_t owlCry5 = {
 };
 
 const animation_t animations[N_ANIMATIONS] = { owlBlink1, owlDazed4, owlCry5 };
-
-/*====================================================
-  OLED
-  ====================================================*/
-
-const OLED_cmd_t clearOLED = {
-    {0xFF, 0xD7},
-    2,
-    true
-};
 
 /*====================================================
   Set-up
@@ -212,9 +257,9 @@ void loop() {
     id = idTag(magnetTag);
     /* if valid id then play animation */
     if ( (0 <= id) && (id < N_ANIMATIONS) ) {
-        playAnimation
+        playAnimation(id);
     } else {
-        clearOLED();
+        commandOLED(OLED_CLEAR);
     }
 
     /* Debug print */
@@ -224,15 +269,6 @@ void loop() {
     Serial.print(' ');
     Serial.print(id);
     Serial.print("; ");
-
-    OLED.write(0xFF);  //MSB
-    OLED.write(0xD7);  //LSB
-    while( !OLED.available() );
-    OLED.readBytes(buf, 1);
-    Serial.print( buf );
-    Serial.println();
-
-
 
 }
 
@@ -305,12 +341,23 @@ magnet_polarity_t readMagnet(int sensorPin) {
   OLED
   ====================================================*/
 
-bool waitAckOLED() {
+/* play given animation with id
+ * returns boolean true for success
+ */
+bool playAnimation(int id) {
+    commandOLED( animations[i] )
+}
+
+bool waitAckOLED(bool ackVal) {
     // TODO this function may block for too long
-    char ack;
+    char ack[2];
     while( !OLED.available() );
-    OLED.readBytes(&ack, 1);
-    return (OLED_ACK == ack) ;
+    if (ackVal) {
+        OLED.readBytes(&ack, 2);
+    } else {
+        OLED.readBytes(&ack, 1);        
+    }
+    return (OLED_ACK == ack[0]) ;
 }
 
 /* commandOLED sends given command to OLED and returns bool
@@ -323,7 +370,7 @@ bool commandOLED(OLED_cmd_t cmd) {
     }
 
     if (cmd.ack) {
-        return waitAckOLED();
+        return waitAckOLED(cmd.ackVal);
     }
     return true;
 }
