@@ -16,7 +16,7 @@
   ====================================================*/
 
 typedef enum {
-    POS, NEG, NONE
+    POLE_POS, POLE_NEG, POLE_NONE
 } magnet_polarity_t;
 
 typedef struct {
@@ -28,6 +28,7 @@ typedef struct {
 typedef struct {
     magnet_tag_t tag;
     int vidSector;
+    byte id;
 } animation_t;
 
 /*====================================================
@@ -37,8 +38,12 @@ typedef struct {
 const int HALL_SENSOR_0 = A0;
 const int HALL_SENSOR_1 = A1;
 const int HALL_SENSOR_2 = A2;
+
 const int N_CALIBRATION_SAMPLES = 100;
 const int VARIANCE_SCALER = 4;
+const int DEFAULT_SENSOR_THRESHOLD = 512;
+const int DEFAULT_SENSOR_VARIANCE = 118;
+
 const int SERIAL_BAUD = 9600;
 const int N_ANIMATIONS = 3;
 
@@ -54,18 +59,21 @@ int sensorVariance;
   ====================================================*/
 
 const animation_t owlBlink1 = {
-    {NEG, POS, POS},
+    {POLE_NEG, POLE_POS, POLE_POS},
+    0,
     0
 };
 
 const animation_t owlDazed4 = {
-    {POS, POS, POS},
-    0
+    {POLE_POS, POLE_POS, POLE_POS},
+    0,
+    1
 };
 
 const animation_t owlCry5 = {
-    {NEG, POS, NEG},
-    0
+    {POLE_NEG, POLE_POS, POLE_NEG},
+    0,
+    2
 };
 
 const animation_t animations[N_ANIMATIONS] = { owlBlink1, owlDazed4, owlCry5 };
@@ -95,39 +103,42 @@ void setup() {
  */
 int calibrateSensor(int nSamples, int sensorPin) {
     int polarityRead0, polarityRead1, dist0, dist1;
+    char usrCmd;
+
+    // set defaults, user can choose to override
+    sensorThreshold = DEFAULT_SENSOR_THRESHOLD;
+    sensorVariance  = DEFAULT_SENSOR_VARIANCE;
 
     Serial.println("Calibrating Sensor");
 
-    // get measurements
-    waitOnUserInput("Do not place magnet nearby");
-    sensorThreshold = calibrateSensorAverage(nSamples, sensorPin);
+    usrCmd = waitOnUserInput("Do not place magnet nearby or send 'd' to use defaults");
+
+    // get measurements if user does not want to use defaults
+    if ( usrCmd != 'd' ) {
+        sensorThreshold = calibrateSensorAverage(nSamples, sensorPin);
+        
+        waitOnUserInput("Place magnet nearby");
+        polarityRead0 = calibrateSensorAverage(nSamples, sensorPin);
+
+        waitOnUserInput("Flip magnet over and place nearby");
+        polarityRead1 = calibrateSensorAverage(nSamples, sensorPin);
+
+        // calculate variance
+        dist0 = abs(sensorThreshold - polarityRead0);
+        dist1 = abs(sensorThreshold - polarityRead1);
+        sensorVariance = (dist0 + dist1) / (2 * VARIANCE_SCALER ); // halve for average and scale
+    }
     
-    waitOnUserInput("Place magnet nearby");
-    polarityRead0 = calibrateSensorAverage(nSamples, sensorPin);
-
-    waitOnUserInput("Flip magnet over and place nearby");
-    polarityRead1 = calibrateSensorAverage(nSamples, sensorPin);
-
-    // calculate variance
-    dist0 = abs(sensorThreshold - polarityRead0);
-    dist1 = abs(sensorThreshold - polarityRead1);
-    sensorVariance = (dist0 + dist1) / (2 * VARIANCE_SCALER ); // halve for average and scale
-
     // report results
     Serial.print("Done Calibrating SensorThreshold: ");
     Serial.print(sensorThreshold);
     Serial.print(" +/- ");
     Serial.println(sensorVariance);
-    waitOnUserInput("Does this look good?");
-
-}
-
-void waitOnUserInput(char * msg) {
-
-    Serial.println(msg);
-    Serial.println("Send any char");
-    while( !Serial.available() );
-    Serial.read();
+    usrCmd = waitOnUserInput("Does this look good? ('y'/'n')");
+    if (usrCmd == 'n') {
+        // retry
+        calibrateSensor(nSamples, sensorPin); 
+    }
 
 }
 
@@ -151,11 +162,53 @@ int calibrateSensorAverage(int nSamples, int sensorPin) {
 void loop() {
 
     magnet_tag_t magnetTag = readMagnetTag();
-    char magnetPolarity1 = readMagnet(HALL_SENSOR_1);
-    char magnetPolarity2 = readMagnet(HALL_SENSOR_2);
 
+    printMagnetPolarity(magnetTag.pole0);
+    printMagnetPolarity(magnetTag.pole1);
+    printMagnetPolarity(magnetTag.pole2);
+    Serial.print(' ');
+    Serial.print(idTag(magnetTag));
     Serial.println(';');
 
+}
+
+/*====================================================
+  Tag Idenitifcation
+  ====================================================*/
+
+/* idTag - identify the animation with the given tag
+ * returns -1 if no tag matched or if one of the poles
+ * is POLE_NONE. If a match is made the index in 
+ * the animations array is returned.
+ */
+int idTag(magnet_tag_t magnetTag) {
+    int i;
+
+    /* no match if any pole is POLE_NONE */
+    if ( (magnetTag.pole0 == POLE_NONE) || 
+         (magnetTag.pole1 == POLE_NONE) ||
+         (magnetTag.pole2 == POLE_NONE) ) {
+        return -1;
+    }
+
+    for(i = 0; i < N_ANIMATIONS; i++) {
+        animation_t animation = animations[i];
+        if( magnetTagEquals(magnetTag, animation.tag) ) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+/* equlity function for magnet tags */
+int magnetTagEquals(magnet_tag_t magnetTag0, magnet_tag_t magnetTag1) {
+    if ( (magnetTag0.pole0 == magnetTag1.pole0) &&
+         (magnetTag0.pole1 == magnetTag1.pole1) &&
+         (magnetTag0.pole2 == magnetTag1.pole2) ) {
+        return 1;
+    }
+    return 0;
 }
 
 magnet_tag_t readMagnetTag() {
@@ -168,18 +221,42 @@ magnet_tag_t readMagnetTag() {
     return magnetTag;
 }
 
-char readMagnet(int sensorPin) {
+magnet_polarity_t readMagnet(int sensorPin) {
     /* determine magnet polarity based off of sensorThreshold */
     
-    char magnetPolarity = '0';
+    magnet_polarity_t magnetPolarity = POLE_NONE;
 
     int sensorVal = analogRead(sensorPin);
     
     if( (sensorVal < (sensorThreshold - sensorVariance)) ) {
-        magnetPolarity = '-';
+        magnetPolarity = POLE_NEG;
     } else if ( (sensorVal > (sensorThreshold + sensorVariance)) ) {
-        magnetPolarity = '+';
+        magnetPolarity = POLE_POS;
     }
 
     return magnetPolarity;
+}
+
+/*====================================================
+  Debug
+  ====================================================*/
+
+char waitOnUserInput(char * msg) {
+    Serial.println(msg);
+    Serial.println("Send any char");
+    while( !Serial.available() );
+    return Serial.read();
+}
+
+void printMagnetPolarity(magnet_polarity_t pole) {
+    char poleSym;
+    if (pole == POLE_NEG) {
+        poleSym = '-';
+    } else if (pole == POLE_POS) {
+        poleSym = '+';
+    } else {
+        poleSym = '0';
+    }
+
+    Serial.print(poleSym);
 }
