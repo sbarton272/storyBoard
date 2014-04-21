@@ -7,9 +7,13 @@
  * - 3 Hall Effect Sensors
  * - OLED Display: https://www.4dsystems.com.au/product/uTOLED_20_G2/
  * 
+ * Serial is connected to USB with SoftwareSerial to communicate with the OLED. 
+ *
  * The three Hall Effect Sensors are laid out in a L to detect magnets in the 
  *  same config. Sensor values are polarity (+/-) or no magnet (0).
  */
+
+#include <SoftwareSerial.h>
 
 /*====================================================
   Structs
@@ -35,22 +39,32 @@ typedef struct {
   Macros
   ====================================================*/
 
-const int HALL_SENSOR_0 = A0;
-const int HALL_SENSOR_1 = A1;
-const int HALL_SENSOR_2 = A2;
+/* Pin defs */
+#define HALL_SENSOR_0 (A0)
+#define HALL_SENSOR_1 (A1)
+#define HALL_SENSOR_2 (A2)
 
-const int N_CALIBRATION_SAMPLES = 100;
-const int VARIANCE_SCALER = 4;
-const int DEFAULT_SENSOR_THRESHOLD = 512;
-const int DEFAULT_SENSOR_VARIANCE = 118;
+/* Serial */
+#define SERIAL_BAUD (9600)
+#define SOFT_SERIAL_BAUD (9600)
+#define SOFT_RX_PIN (2)
+#define SOFT_TX_PIN (3)
+#define OLED_RESET_PIN (4)
+#define OLED_RESET_DELAY (400)
 
-const int SERIAL_BAUD = 9600;
-const int N_ANIMATIONS = 3;
+/* Hall sensors */
+#define N_CALIBRATION_SAMPLES (100)
+#define VARIANCE_SCALER (4)
+#define DEFAULT_SENSOR_THRESHOLD (512)
+#define DEFAULT_SENSOR_VARIANCE (118)
+
+#define N_ANIMATIONS (3)
 
 /*====================================================
   Globals
   ====================================================*/
 
+SoftwareSerial OLED = SoftwareSerial(SOFT_RX_PIN, SOFT_TX_PIN);
 int sensorThreshold;
 int sensorVariance;
 
@@ -83,13 +97,25 @@ const animation_t animations[N_ANIMATIONS] = { owlBlink1, owlDazed4, owlCry5 };
   ====================================================*/
 
 void setup() {
-    Serial.begin(9600);
+    /* Serial */
+    pinMode(SOFT_RX_PIN, INPUT);
+    pinMode(SOFT_TX_PIN, OUTPUT);
+    OLED.begin(SOFT_SERIAL_BAUD);
+    Serial.begin(SERIAL_BAUD);
+
+    /* Sensors */
     pinMode(HALL_SENSOR_0, INPUT);
     pinMode(HALL_SENSOR_1, INPUT);
     pinMode(HALL_SENSOR_2, INPUT);
 
+    /* OLED Reset */
+    pinMode(OLED_RESET_PIN, OUTPUT);
+    delay(OLED_RESET_DELAY);
+    digitalWrite(OLED_RESET_PIN, HIGH);
+    delay(OLED_RESET_DELAY);
+    digitalWrite(OLED_RESET_PIN, LOW);
+
     // calibrate hall effect sensor
-    // TODO figure out a better way to determine variance
     calibrateSensor(N_CALIBRATION_SAMPLES, HALL_SENSOR_0);
 
 }
@@ -160,6 +186,7 @@ int calibrateSensorAverage(int nSamples, int sensorPin) {
   ====================================================*/
 
 void loop() {
+    char buf[2] = "A";
 
     magnet_tag_t magnetTag = readMagnetTag();
 
@@ -168,7 +195,14 @@ void loop() {
     printMagnetPolarity(magnetTag.pole2);
     Serial.print(' ');
     Serial.print(idTag(magnetTag));
-    Serial.println(';');
+    Serial.print("; ");
+
+    OLED.write(0xFF);  //MSB
+    OLED.write(0xD7);  //LSB
+    while( !OLED.available() );
+    OLED.readBytes(buf, 1);
+    Serial.print( buf );
+    Serial.println();
 
 }
 
