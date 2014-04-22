@@ -68,7 +68,7 @@ typedef struct {
 } OLED_cmd_t;
 
 typedef struct {
-    byte sect[N_SECTOR_BYTES]; // TODO more memory efficient ways to pass around cmd
+    byte setSectCmd[N_SECTOR_BYTES]; // TODO more memory efficient ways to pass around cmd
     magnet_tag_t tag;
     byte vidSector[N_SECTOR_BYTES];
     byte id;
@@ -142,21 +142,21 @@ OLED_cmd_t OLED_SET_IMG = {
   ====================================================*/
 
 const animation_t owlBlink1 = {
-    {0x00, 0x00, 0x00, 0x51},
+    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x51},
     {POLE_NEG, POLE_POS, POLE_POS},
     0,
     0
 };
 
 const animation_t owlDazed4 = {
-    {0x00, 0x00, 0x00, 0x51},
+    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x51},
     {POLE_POS, POLE_POS, POLE_POS},
     0,
     1
 };
 
 const animation_t owlCry5 = {
-    {0x00, 0x00, 0x01, 0x92},
+    {0xFF, 0xB8, 0x00, 0x00, 0x01, 0x92},
     {POLE_NEG, POLE_POS, POLE_NEG},
     0,
     2
@@ -195,7 +195,7 @@ void setup() {
     // OLED media init, and stopscrolling
     // TODO may need to work on timing
     commandOLED(OLED_SS_TIMEOUT);
-    commandOLED(OLED_MEDIA_INIT);
+    Serial.println( commandOLED(OLED_MEDIA_INIT) );
     commandOLED(OLED_CLEAR);
 
 }
@@ -277,7 +277,8 @@ void loop() {
     if ( (0 <= id) && (id < N_ANIMATIONS) ) {
         //playAnimation(id, bIsNewId);
         commandOLED(OLED_CLEAR);
-        commandOLED(OLED_SET_SECT);
+        byte sect[N_SECTOR_BYTES] = {0x00, 0x00, 0x00, 0x51};
+        commandOLED( makeSetSectorCmd(sect) );
         playAnimation(0, false);
     } else {
         commandOLED(OLED_SET_SECT);
@@ -378,7 +379,7 @@ bool playAnimation(int id, bool bNewId) {
     // if is new id then set sector
     if ( bNewId ) {
         // set sector location for animation
-        bool ack = commandOLED( makeSetSectorCmd(animations[id].sect) );
+        bool ack = commandOLED( makeSetSectorCmd(animations[id].setSectorCmd) );
         // if valid set-sector not set then have problem
         if ( !ack ) { 
             return false;
@@ -393,25 +394,14 @@ bool playAnimation(int id, bool bNewId) {
  *  as a template
  */
 
-OLED_cmd_t makeSetSectorCmd( const byte* sect ) {
+OLED_cmd_t makeSetSectorCmd( const byte* setSectCmd ) {
     
     OLED_cmd_t setSectorCmd;
 
     setSectorCmd.len = OLED_SET_SECT.len;
     setSectorCmd.ack = OLED_SET_SECT.ack;
     setSectorCmd.ackVal = OLED_SET_SECT.ackVal;
-
-    // set cmd
-    for (int i = 0; i < setSectorCmd.len; i++) {
-        setSectorCmd.cmds[i] = OLED_SET_SECT.cmds[i];
-    }
-
-    // set sect in cmd which is back N_SECTOR_BYTES
-    // TODO assume N_SECTOR_BYTES < len
-    int offset = setSectorCmd.len - N_SECTOR_BYTES; 
-    for (int i = 0; i < N_SECTOR_BYTES; i++) {
-        setSectorCmd.cmds[i + offset] = sect[i];        
-    }
+    setSectorCmd.cmds = setSectCmd;
 
     return setSectorCmd;
 
