@@ -203,6 +203,7 @@ int calibrateSensor(int nSamples, int sensorPin) {
 
     Serial.println("Calibrating Sensor");
 
+    // returns byte, cast to char - assume same size
     usrCmd = waitOnUserInput("Do not place magnet nearby or send 'd' to use defaults");
 
     // get measurements if user does not want to use defaults
@@ -254,12 +255,13 @@ int calibrateSensorAverage(int nSamples, int sensorPin) {
 void loop() {
     char buf[2] = "A";
     int id;
+    bool bIsNewId = true;
 
     magnet_tag_t magnetTag = readMagnetTag();
     id = idTag(magnetTag);
     /* if valid id then play animation */
     if ( (0 <= id) && (id < N_ANIMATIONS) ) {
-        playAnimation(id);
+        playAnimation(id, bIsNewId);
     } else {
         commandOLED(OLED_CLEAR);
     }
@@ -357,7 +359,7 @@ bool playAnimation(int id, bool bNewId) {
     // if is new id then set sector
     if ( bNewId ) {
         // set sector location for animation
-        bool ack = commandOLED( makeSetSectorCmd(animation[id].sect) );
+        bool ack = commandOLED( makeSetSectorCmd(animations[id].sect) );
         // if valid set-sector not set then have problem
         if ( !ack ) { 
             return false;
@@ -372,7 +374,7 @@ bool playAnimation(int id, bool bNewId) {
  *  as a template
  */
 
-OLED_cmd_t makeSetSectorCmd( byte* sect ) {
+OLED_cmd_t makeSetSectorCmd( const byte* sect ) {
     
     OLED_cmd_t setSectorCmd;
 
@@ -416,9 +418,9 @@ bool waitAckOLED(bool ackVal) {
     char ack[2];
     while( !OLED.available() );
     if (ackVal) {
-        OLED.readBytes(&ack, 2);
+        OLED.readBytes(ack, 2);
     } else {
-        OLED.readBytes(&ack, 1);        
+        OLED.readBytes(ack, 1);        
     }
     return (OLED_ACK == ack[0]) ;
 }
@@ -428,10 +430,12 @@ bool waitAckOLED(bool ackVal) {
   ====================================================*/
 
 char waitOnUserInput(char * msg) {
+    char buf;
     Serial.println(msg);
     Serial.println("Send any char");
     while( !Serial.available() );
-    return Serial.read();
+    Serial.readBytes(&buf, 1);
+    return buf;
 }
 
 void printMagnetPolarity(magnet_polarity_t pole) {
