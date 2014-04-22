@@ -79,6 +79,7 @@ typedef struct {
   ====================================================*/
 
 SoftwareSerial OLED = SoftwareSerial(SOFT_RX_PIN, SOFT_TX_PIN);
+bool bDebugSerConn;
 int sensorThreshold;
 int sensorVariance;
 
@@ -171,6 +172,7 @@ void setup() {
     pinMode(SOFT_TX_PIN, OUTPUT);
     OLED.begin(SOFT_SERIAL_BAUD);
     Serial.begin(SERIAL_BAUD);
+    bDebugSerConn = (Serial) ? true : false;
 
     /* Sensors */
     pinMode(HALL_SENSOR_0, INPUT);
@@ -187,7 +189,7 @@ void setup() {
     Serial.println("Online");
 
     // calibrate hall effect sensor
-    calibrateSensor(N_CALIBRATION_SAMPLES, HALL_SENSOR_0);
+    calibrateSensor( bDebugSerConn, N_CALIBRATION_SAMPLES, HALL_SENSOR_0);
 
     // OLED media init, and stopscrolling
     // TODO may need to work on timing
@@ -204,13 +206,17 @@ void setup() {
  * magnet flipped over. The scaled average distance from the 
  * threshold is then the variance
  */
-int calibrateSensor(int nSamples, int sensorPin) {
+void calibrateSensor(bool bDebugSerConn, int nSamples, int sensorPin) {
     int polarityRead0, polarityRead1, dist0, dist1;
     char usrCmd;
 
     // set defaults, user can choose to override
     sensorThreshold = DEFAULT_SENSOR_THRESHOLD;
     sensorVariance  = DEFAULT_SENSOR_VARIANCE;
+
+    if ( !bDebugSerConn ) {
+        return; // use defaults
+    }
 
     Serial.println("Calibrating Sensor");
 
@@ -241,7 +247,7 @@ int calibrateSensor(int nSamples, int sensorPin) {
     usrCmd = waitOnUserInput("Does this look good? ('y'/'n')");
     if (usrCmd == 'n') {
         // retry
-        calibrateSensor(nSamples, sensorPin); 
+        calibrateSensor(bDebugSerConn, nSamples, sensorPin); 
     }
 
 }

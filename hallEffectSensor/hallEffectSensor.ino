@@ -6,6 +6,9 @@ const int HALL_SENSOR_2 = A2;
 const int N_CALIBRATION_SAMPLES = 100;
 const int VARIANCE_SCALER = 4;
 
+#define DEFAULT_SENSOR_THRESHOLD (512)
+#define DEFAULT_SENSOR_VARIANCE (118)
+
 int sensorThreshold;
 int sensorVariance;
 
@@ -32,32 +35,45 @@ void setup() {
  * magnet flipped over. The scaled average distance from the 
  * threshold is then the variance
  */
-int calibrateSensor(int nSamples, int sensorPin) {
+void calibrateSensor(int nSamples, int sensorPin) {
     int polarityRead0, polarityRead1, dist0, dist1;
+    char usrCmd;
+
+    // set defaults, user can choose to override
+    sensorThreshold = DEFAULT_SENSOR_THRESHOLD;
+    sensorVariance  = DEFAULT_SENSOR_VARIANCE;
 
     Serial.println("Calibrating Sensor");
 
-    // get measurements
-    waitOnUserInput("Do not place magnet nearby");
-    sensorThreshold = calibrateSensorAverage(nSamples, sensorPin);
+    // returns byte, cast to char - assume same size
+    usrCmd = waitOnUserInput("Do not place magnet nearby or send 'd' to use defaults");
+
+    // get measurements if user does not want to use defaults
+    if ( usrCmd != 'd' ) {
+        sensorThreshold = calibrateSensorAverage(nSamples, sensorPin);
+        
+        waitOnUserInput("Place magnet nearby");
+        polarityRead0 = calibrateSensorAverage(nSamples, sensorPin);
+
+        waitOnUserInput("Flip magnet over and place nearby");
+        polarityRead1 = calibrateSensorAverage(nSamples, sensorPin);
+
+        // calculate variance
+        dist0 = abs(sensorThreshold - polarityRead0);
+        dist1 = abs(sensorThreshold - polarityRead1);
+        sensorVariance = (dist0 + dist1) / (2 * VARIANCE_SCALER ); // halve for average and scale
+    }
     
-    waitOnUserInput("Place magnet nearby");
-    polarityRead0 = calibrateSensorAverage(nSamples, sensorPin);
-
-    waitOnUserInput("Flip magnet over and place nearby");
-    polarityRead1 = calibrateSensorAverage(nSamples, sensorPin);
-
-    // calculate variance
-    dist0 = abs(sensorThreshold - polarityRead0);
-    dist1 = abs(sensorThreshold - polarityRead1);
-    sensorVariance = (dist0 + dist1) / (2 * VARIANCE_SCALER ); // halve for average and scale
-
     // report results
     Serial.print("Done Calibrating SensorThreshold: ");
     Serial.print(sensorThreshold);
     Serial.print(" +/- ");
     Serial.println(sensorVariance);
-    waitOnUserInput("Does this look good?");
+    usrCmd = waitOnUserInput("Does this look good? ('y'/'n')");
+    if (usrCmd == 'n') {
+        // retry
+        calibrateSensor(bDebugSerConn, nSamples, sensorPin); 
+    }
 
 }
 
@@ -110,10 +126,10 @@ char readMagnet(int sensorPin) {
         magnetPolarity = '+';
     }
 
-    //Serial.print( sensorPin );
-    //Serial.print( ' ' );
-    //Serial.print( sensorVal );
-    //Serial.print( ' ' );
+    Serial.print( sensorPin );
+    Serial.print( ' ' );
+    Serial.print( sensorVal );
+    Serial.print( ' ' );
     Serial.print( magnetPolarity );
     Serial.print( '\t' );
 
