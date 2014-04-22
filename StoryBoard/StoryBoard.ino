@@ -13,34 +13,9 @@
  *  same config. Sensor values are polarity (+/-) or no magnet (0).
  */
 
+ // TODO split this file up
+
 #include <SoftwareSerial.h>
-
-/*====================================================
-  Structs
-  ====================================================*/
-
-typedef enum {
-    POLE_POS, POLE_NEG, POLE_NONE
-} magnet_polarity_t;
-
-typedef struct {
-    magnet_polarity_t pole0;
-    magnet_polarity_t pole1;
-    magnet_polarity_t pole2;
-} magnet_tag_t;
-
-typedef struct {
-    magnet_tag_t tag;
-    int vidSector;
-    byte id;
-} animation_t;
-
-typedef struct {
-    byte[] cmds;
-    int len;
-    bool ack;
-    bool ackVal;
-} OLED_cmd_t;
 
 /*====================================================
   Macros
@@ -61,14 +36,43 @@ typedef struct {
 
 /* OLED Commands and Interface */
 #define OLED_ACK (0x06)
+#define N_SECTOR_BYTES (4)
 
-/* Hall sensors */
+/* Hall effect sensors */
 #define N_CALIBRATION_SAMPLES (100)
 #define VARIANCE_SCALER (4)
 #define DEFAULT_SENSOR_THRESHOLD (512)
 #define DEFAULT_SENSOR_VARIANCE (118)
 
 #define N_ANIMATIONS (3)
+
+/*====================================================
+  Structs
+  ====================================================*/
+
+typedef enum {
+    POLE_POS, POLE_NEG, POLE_NONE
+} magnet_polarity_t;
+
+typedef struct {
+    magnet_polarity_t pole0;
+    magnet_polarity_t pole1;
+    magnet_polarity_t pole2;
+} magnet_tag_t;
+
+typedef struct {
+    byte* cmds;
+    int len;
+    bool ack;
+    bool ackVal;
+} OLED_cmd_t;
+
+typedef struct {
+    byte sect[N_SECTOR_BYTES]; // TODO more memory efficient ways to pass around cmd
+    magnet_tag_t tag;
+    byte vidSector[N_SECTOR_BYTES];
+    byte id;
+} animation_t;
 
 /*====================================================
   Globals
@@ -82,73 +86,69 @@ int sensorVariance;
   OLED
   ====================================================*/
 
-const OLED_cmd_t OLED_CLEAR = {
-    {0xFF, 0xD7},
+// TODO i don't like this. They should all be const but need to 
+//  figure out how to have variable array len in const
+
+byte OLED_CLEAR_CMD[2] = {0xFF, 0xD7};
+OLED_cmd_t OLED_CLEAR = {
+    OLED_CLEAR_CMD,
     2,
     true,
     false
 };
 
-const OLED_cmd_t OLED_SS_TIMEOUT = {
-    {0x00, 0x0C, 0x00, 0x00},
+byte OLED_SS_TIMEOUT_CMD[4] = {0x00, 0x0C, 0x00, 0x00};
+OLED_cmd_t OLED_SS_TIMEOUT = {
+    OLED_SS_TIMEOUT_CMD,
     4,
     true,
     false
 };
 
-const OLED_cmd_t OLED_MEDIA_INIT = {
-    {0xFF, 0xB1},
+byte OLED_MEDIA_INIT_CMD[2] = {0xFF, 0xB1};
+OLED_cmd_t OLED_MEDIA_INIT = {
+    OLED_MEDIA_INIT_CMD,
     2,
     true,
     true
 };
 
-const OLED_cmd_t OLED_SET_SECT_0 = {
-    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x00},
+byte OLED_SET_SECT_CMD[6] = {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x00};
+OLED_cmd_t OLED_SET_SECT = {
+    OLED_SET_SECT_CMD,
     6,
     true,
     false
 };
 
-const OLED_cmd_t OLED_RUN_VIDEO = {
-    {0xFF, 0xBB, 0x00, 0x00, 0x00, 0x00},
+byte OLED_RUN_VIDEO_CMD[6] = {0xFF, 0xBB, 0x00, 0x00, 0x00, 0x00};
+OLED_cmd_t OLED_RUN_VIDEO = {
+    OLED_RUN_VIDEO_CMD,
     6,
     true,
     false
 };
-
-const OLED_cmd_t OLED_VIDEO_FRAME_0 = {
-    {0xFF, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    8,
-    true,
-    false
-};
-
-const OLED_cmd_t OLED_VIDEO_FRAME_1 = {
-    {0xFF, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
-    8,
-    true,
-    false
-};
-
 
 /*====================================================
   Animations
   ====================================================*/
 
 const animation_t owlBlink1 = {
+    {0x00, 0x00, 0x00, 0x51},
     {POLE_NEG, POLE_POS, POLE_POS},
     0,
     0
 };
 
 const animation_t owlDazed4 = {
+    {0x00, 0x00, 0x00, 0x51},
     {POLE_POS, POLE_POS, POLE_POS},
     0,
     1
 };
 
 const animation_t owlCry5 = {
+    {0x00, 0x00, 0x01, 0x92},
     {POLE_NEG, POLE_POS, POLE_NEG},
     0,
     2
@@ -178,6 +178,8 @@ void setup() {
     digitalWrite(OLED_RESET_PIN, LOW);
     delay(OLED_RESET_DELAY);
     digitalWrite(OLED_RESET_PIN, HIGH);
+
+    // TODO media init, timeout
 
     // calibrate hall effect sensor
     calibrateSensor(N_CALIBRATION_SAMPLES, HALL_SENSOR_0);
@@ -341,23 +343,57 @@ magnet_polarity_t readMagnet(int sensorPin) {
   OLED
   ====================================================*/
 
-/* play given animation with id
+/* play given animation with id. Requires valid id
+ * if this id is new then need to set sector otherwise just run
  * returns boolean true for success
  */
-bool playAnimation(int id) {
-    commandOLED( animations[i] )
+bool playAnimation(int id, bool bNewId) {
+    
+    // require valid id
+    if( !(0 <= id && id < N_ANIMATIONS) ) {
+        return false;
+    }
+
+    // if is new id then set sector
+    if ( bNewId ) {
+        // set sector location for animation
+        bool ack = commandOLED( makeSetSectorCmd(animation[id].sect) );
+        // if valid set-sector not set then have problem
+        if ( !ack ) { 
+            return false;
+        }
+    }
+
+    return commandOLED( OLED_RUN_VIDEO );
 }
 
-bool waitAckOLED(bool ackVal) {
-    // TODO this function may block for too long
-    char ack[2];
-    while( !OLED.available() );
-    if (ackVal) {
-        OLED.readBytes(&ack, 2);
-    } else {
-        OLED.readBytes(&ack, 1);        
+/* makeSetSectorCmd Requires an animation with a sector and 
+ *  makes a setSectorCmd using that sector. Uses OLED_SET_SECT
+ *  as a template
+ */
+
+OLED_cmd_t makeSetSectorCmd( byte* sect ) {
+    
+    OLED_cmd_t setSectorCmd;
+
+    setSectorCmd.len = OLED_SET_SECT.len;
+    setSectorCmd.ack = OLED_SET_SECT.ack;
+    setSectorCmd.ackVal = OLED_SET_SECT.ackVal;
+
+    // set cmd
+    for (int i = 0; i < setSectorCmd.len; i++) {
+        setSectorCmd.cmds[i] = OLED_SET_SECT.cmds[i];
     }
-    return (OLED_ACK == ack[0]) ;
+
+    // set sect in cmd which is back N_SECTOR_BYTES
+    // TODO assume N_SECTOR_BYTES < len
+    int offset = setSectorCmd.len - N_SECTOR_BYTES; 
+    for (int i = 0; i < N_SECTOR_BYTES; i++) {
+        setSectorCmd.cmds[i + offset] = sect[i];        
+    }
+
+    return setSectorCmd;
+
 }
 
 /* commandOLED sends given command to OLED and returns bool
@@ -373,6 +409,18 @@ bool commandOLED(OLED_cmd_t cmd) {
         return waitAckOLED(cmd.ackVal);
     }
     return true;
+}
+
+bool waitAckOLED(bool ackVal) {
+    // TODO this function may block for too long
+    char ack[2];
+    while( !OLED.available() );
+    if (ackVal) {
+        OLED.readBytes(&ack, 2);
+    } else {
+        OLED.readBytes(&ack, 1);        
+    }
+    return (OLED_ACK == ack[0]) ;
 }
 
 /*====================================================
