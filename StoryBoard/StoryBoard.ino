@@ -14,6 +14,7 @@
  */
 
  // TODO split this file up
+ // TODO reset OLED if problems
 
 #include <SoftwareSerial.h>
 
@@ -36,7 +37,7 @@
 
 /* OLED Commands and Interface */
 #define OLED_ACK (0x06)
-#define N_SECTOR_BYTES (4)
+#define N_SET_SECTOR_CMD_BYTES (6)
 
 /* Hall effect sensors */
 #define N_CALIBRATION_SAMPLES (100)
@@ -68,9 +69,8 @@ typedef struct {
 } OLED_cmd_t;
 
 typedef struct {
-    byte setSectCmd[N_SECTOR_BYTES]; // TODO more memory efficient ways to pass around cmd
+    byte setSectCmd[N_SET_SECTOR_CMD_BYTES]; // TODO more memory efficient ways to pass around cmd
     magnet_tag_t tag;
-    byte vidSector[N_SECTOR_BYTES];
     byte id;
 } animation_t;
 
@@ -141,28 +141,25 @@ OLED_cmd_t OLED_SET_IMG = {
   Animations
   ====================================================*/
 
-const animation_t owlBlink1 = {
+animation_t owlBlink1 = {
     {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x51},
     {POLE_NEG, POLE_POS, POLE_POS},
-    0,
     0
 };
 
-const animation_t owlDazed4 = {
+animation_t owlDazed4 = {
     {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x51},
     {POLE_POS, POLE_POS, POLE_POS},
-    0,
     1
 };
 
-const animation_t owlCry5 = {
+animation_t owlCry5 = {
     {0xFF, 0xB8, 0x00, 0x00, 0x01, 0x92},
     {POLE_NEG, POLE_POS, POLE_NEG},
-    0,
     2
 };
 
-const animation_t animations[N_ANIMATIONS] = { owlBlink1, owlDazed4, owlCry5 };
+animation_t animations[N_ANIMATIONS] = { owlBlink1, owlDazed4, owlCry5 };
 
 /*====================================================
   Set-up
@@ -269,17 +266,13 @@ int calibrateSensorAverage(int nSamples, int sensorPin) {
 void loop() {
     char buf[2];
     int id;
-    bool bIsNewId = true;
+    bool bIsNewId = true; // TODO reduce noise by checking prior id
 
     magnet_tag_t magnetTag = readMagnetTag();
     id = idTag(magnetTag);
     /* if valid id then play animation */
     if ( (0 <= id) && (id < N_ANIMATIONS) ) {
-        //playAnimation(id, bIsNewId);
-        commandOLED(OLED_CLEAR);
-        byte sect[N_SECTOR_BYTES] = {0x00, 0x00, 0x00, 0x51};
-        commandOLED( makeSetSectorCmd(sect) );
-        playAnimation(0, false);
+        playAnimation(id, bIsNewId);
     } else {
         commandOLED(OLED_SET_SECT);
         commandOLED(OLED_SET_IMG);
@@ -379,7 +372,7 @@ bool playAnimation(int id, bool bNewId) {
     // if is new id then set sector
     if ( bNewId ) {
         // set sector location for animation
-        bool ack = commandOLED( makeSetSectorCmd(animations[id].setSectorCmd) );
+        bool ack = commandOLED( makeSetSectorCmd(animations[id].setSectCmd) );
         // if valid set-sector not set then have problem
         if ( !ack ) { 
             return false;
@@ -394,14 +387,15 @@ bool playAnimation(int id, bool bNewId) {
  *  as a template
  */
 
-OLED_cmd_t makeSetSectorCmd( const byte* setSectCmd ) {
+OLED_cmd_t makeSetSectorCmd( byte* setSectCmd ) {
     
     OLED_cmd_t setSectorCmd;
 
     setSectorCmd.len = OLED_SET_SECT.len;
     setSectorCmd.ack = OLED_SET_SECT.ack;
     setSectorCmd.ackVal = OLED_SET_SECT.ackVal;
-    setSectorCmd.cmds = setSectCmd;
+    // points to setSectCmd TODO should do deep copy
+    setSectorCmd.cmds = setSectCmd; 
 
     return setSectorCmd;
 
