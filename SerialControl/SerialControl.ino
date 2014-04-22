@@ -25,6 +25,9 @@ SoftwareSerial OLED = SoftwareSerial(SOFT_RX_PIN, SOFT_TX_PIN);
   ====================================================*/
 
 void setup() {
+    char buf[2] = "A";
+    byte zero = 0x00;
+
     /* Serial */
     pinMode(SOFT_RX_PIN, INPUT);
     pinMode(SOFT_TX_PIN, OUTPUT);
@@ -40,8 +43,27 @@ void setup() {
     delay(OLED_RESET_DELAY);
 
     Serial.println("online");
-    delay(5000);
+    delay(6000);
     Serial.println("screen should be on");
+
+    OLED.write(0xFF);  //MSB
+    OLED.write(0xD7);  //LSB
+    
+    for(int i = 0; (i < 100) && !OLED.available(); i++ );
+    OLED.readBytes(buf, 1);
+    Serial.print( buf );
+    Serial.println(';');
+
+    // media init
+    OLED.write(zero);
+    OLED.write(0x0C);
+    OLED.write(zero);
+    OLED.write(zero);
+    for(int i = 0; (i < 100) && !OLED.available(); i++ );
+    OLED.readBytes(buf, 1);
+    Serial.print( buf );
+    Serial.println(';');
+
 }
 
 /*====================================================
@@ -49,20 +71,15 @@ void setup() {
   ====================================================*/
 
 void loop() {
-    char buf[2] = "A";
+    char buf[3] = "  ";
+    byte zero = 0x00;
 
-    OLED.write(0xFF);  //MSB
-    OLED.write(0xD7);  //LSB
-    while( !OLED.available() );
-    OLED.readBytes(buf, 1);
-    Serial.print( buf );
-    Serial.println();
+    Serial.println("Starting loop");
 
     OLED.write(0xFF);  //MSB
     OLED.write(0xD2);  //LSB
 
     //start point (x1, y1)
-    byte zero = 0x00;
     OLED.write(zero);  //x1 (MSB)
     OLED.write(zero);  //x1 (LSB)
     OLED.write(zero);  //y1 (MSB)
@@ -78,10 +95,78 @@ void loop() {
     OLED.write(0xFF);  //colour (MSB)
     OLED.write(0xE0);  //colour (LSB)
 
-    while( !OLED.available() );
+    for(int i = 0; (i < 100) && !OLED.available(); i++ );
     OLED.readBytes(buf, 1);
     Serial.print( buf );
-    Serial.println();
+    Serial.println(';');
 
-    delay(1000);
+    // show all videos/images
+
+    OLED.write(0xFF);
+    OLED.write(0xB1);
+    for(int i = 0; (i < 100) && !OLED.available(); i++ );
+    OLED.readBytes(buf, 2);
+    Serial.print( buf );
+    Serial.println(';');
+
+    OLED.write(0xFF);
+    OLED.write(0xB3);
+    OLED.write(zero);
+    OLED.write(zero);
+    OLED.write(zero);
+    OLED.write(zero);
+    for(int i = 0; (i < 100) && !OLED.available(); i++ );
+    OLED.readBytes(buf, 1);
+    Serial.print( buf );
+    Serial.println(';');
+
+    delay(100);
+
+    OLED.write(0xFF);
+    OLED.write(0xB8);
+    OLED.write(zero);
+    OLED.write(zero);
+    OLED.write(zero);
+    OLED.write(0x51);
+    for(int i = 0; (i < 100) && !OLED.available(); i++ );
+    OLED.readBytes(buf, 1);
+    Serial.print( buf );
+    Serial.println(';');
+
+    OLED.write(0xFF);
+    OLED.write(0xBB);
+    OLED.write(zero);
+    OLED.write(zero);
+    OLED.write(zero);
+    OLED.write(zero);
+    for(int i = 0; (i < 100) && !OLED.available(); i++ );
+    OLED.readBytes(buf, 1);
+    Serial.print( buf );
+    Serial.println(';');
+
+    delay(100);
+
+    OLED.write(0xFF);
+    OLED.write(0xB8);
+    OLED.write(zero);
+    OLED.write(zero);
+    OLED.write(0x01);
+    OLED.write(0x92);
+    for(int i = 0; (i < 100) && !OLED.available(); i++ );
+    OLED.readBytes(buf, 1);
+    Serial.print( buf );
+    Serial.println(';');
+
+    OLED.write(0xFF);
+    OLED.write(0xBB);
+    OLED.write(zero);
+    OLED.write(zero);
+    OLED.write(zero);
+    OLED.write(zero);
+    for(int i = 0; (i < 100) && !OLED.available(); i++ );
+    OLED.readBytes(buf, 1);
+    Serial.print( buf );
+    Serial.println(';');
+
+    delay(2000);
 }

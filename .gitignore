@@ -6,4 +6,5 @@
 *.pyc
 documentation
 OLED/serialInchworm
+OLED/twoVidTest
 CapacitivePlate/3Dexample
