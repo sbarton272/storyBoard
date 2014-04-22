@@ -142,7 +142,7 @@ OLED_cmd_t OLED_SET_IMG = {
   ====================================================*/
 
 animation_t owlBlink1 = {
-    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x51},
+    {0xFF, 0xB8, 0x00, 0x00, 0x01, 0x92},
     {POLE_NEG, POLE_POS, POLE_POS},
     0
 };
@@ -154,7 +154,7 @@ animation_t owlDazed4 = {
 };
 
 animation_t owlCry5 = {
-    {0xFF, 0xB8, 0x00, 0x00, 0x01, 0x92},
+    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x51},
     {POLE_NEG, POLE_POS, POLE_NEG},
     2
 };
