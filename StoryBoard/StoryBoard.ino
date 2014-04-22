@@ -129,6 +129,14 @@ OLED_cmd_t OLED_RUN_VIDEO = {
     false
 };
 
+byte OLED_SET_IMG_CMD[6] = {0xFF, 0xB3, 0x00, 0x00, 0x00, 0x00};
+OLED_cmd_t OLED_SET_IMG = {
+    OLED_SET_IMG_CMD,
+    6,
+    true,
+    false
+};
+
 /*====================================================
   Animations
   ====================================================*/
@@ -179,10 +187,16 @@ void setup() {
     delay(OLED_RESET_DELAY);
     digitalWrite(OLED_RESET_PIN, HIGH);
 
-    // TODO media init, timeout
+    Serial.println("Online");
 
     // calibrate hall effect sensor
     calibrateSensor(N_CALIBRATION_SAMPLES, HALL_SENSOR_0);
+
+    // OLED media init, and stopscrolling
+    // TODO may need to work on timing
+    commandOLED(OLED_SS_TIMEOUT);
+    commandOLED(OLED_MEDIA_INIT);
+    commandOLED(OLED_CLEAR);
 
 }
 
@@ -253,7 +267,7 @@ int calibrateSensorAverage(int nSamples, int sensorPin) {
   ====================================================*/
 
 void loop() {
-    char buf[2] = "A";
+    char buf[2];
     int id;
     bool bIsNewId = true;
 
@@ -261,9 +275,14 @@ void loop() {
     id = idTag(magnetTag);
     /* if valid id then play animation */
     if ( (0 <= id) && (id < N_ANIMATIONS) ) {
-        playAnimation(id, bIsNewId);
-    } else {
+        //playAnimation(id, bIsNewId);
         commandOLED(OLED_CLEAR);
+        commandOLED(OLED_SET_SECT);
+        playAnimation(0, false);
+    } else {
+        commandOLED(OLED_SET_SECT);
+        commandOLED(OLED_SET_IMG);
+        //commandOLED(OLED_CLEAR);
     }
 
     /* Debug print */
@@ -272,7 +291,7 @@ void loop() {
     printMagnetPolarity(magnetTag.pole2);
     Serial.print(' ');
     Serial.print(id);
-    Serial.print("; ");
+    Serial.println("; ");
 
 }
 
