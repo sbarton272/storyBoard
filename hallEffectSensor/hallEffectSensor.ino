@@ -72,18 +72,18 @@ void calibrateSensor(int nSamples, int sensorPin) {
     usrCmd = waitOnUserInput("Does this look good? ('y'/'n')");
     if (usrCmd == 'n') {
         // retry
-        calibrateSensor(bDebugSerConn, nSamples, sensorPin); 
+        calibrateSensor(nSamples, sensorPin); 
     }
 
 }
 
-void waitOnUserInput(char * msg) {
-
+char waitOnUserInput(char * msg) {
+    char buf;
     Serial.println(msg);
     Serial.println("Send any char");
     while( !Serial.available() );
-    Serial.read();
-
+    Serial.readBytes(&buf, 1);
+    return buf;
 }
 
 int calibrateSensorAverage(int nSamples, int sensorPin) {
@@ -109,8 +109,8 @@ void loop() {
     char magnetPolarity1 = readMagnet(HALL_SENSOR_1);
     char magnetPolarity2 = readMagnet(HALL_SENSOR_2);
 
-    Serial.println(';');
-
+    Serial.println();
+    
 }
 
 char readMagnet(int sensorPin) {
@@ -127,9 +127,9 @@ char readMagnet(int sensorPin) {
     }
 
     Serial.print( sensorPin );
-    Serial.print( ' ' );
+    Serial.print( '\t' );
     Serial.print( sensorVal );
-    Serial.print( ' ' );
+    Serial.print( '\t' );
     Serial.print( magnetPolarity );
     Serial.print( '\t' );
 
