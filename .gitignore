@@ -4,6 +4,7 @@
 *.pdf
 *.asv
 *.pyc
+*.xlsx
 documentation
 OLED/serialInchworm
 OLED/twoVidTest

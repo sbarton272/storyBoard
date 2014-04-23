@@ -29,11 +29,15 @@
 
 /* Serial */
 #define SERIAL_BAUD (9600)
+#define SER_ENABLE_PIN (13)
 #define SOFT_SERIAL_BAUD (9600)
 #define SOFT_RX_PIN (2)
 #define SOFT_TX_PIN (3)
 #define OLED_RESET_PIN (4)
 #define OLED_RESET_DELAY (400)
+#define OLED_LONG_RESET_DELAY (6000)
+#define HANDSHAKE_TIME (OLED_LONG_RESET_DELAY)
+#define OLED_TIMEOUT (5000)
 
 /* OLED Commands and Interface */
 #define OLED_ACK (0x06)
@@ -172,7 +176,6 @@ void setup() {
     pinMode(SOFT_TX_PIN, OUTPUT);
     OLED.begin(SOFT_SERIAL_BAUD);
     Serial.begin(SERIAL_BAUD);
-    bDebugSerConn = (Serial) ? true : false;
 
     /* Sensors */
     pinMode(HALL_SENSOR_0, INPUT);
@@ -186,17 +189,60 @@ void setup() {
     delay(OLED_RESET_DELAY);
     digitalWrite(OLED_RESET_PIN, HIGH);
 
-    Serial.println("Online");
+    /* determine if Serial is connected
+     * The timeout also gives the OLED time to 
+     * init in the case that Serial is not 
+     * connected.
+     */
+    serialHandshake();
+    debugPrintln("OLED reset");
 
     // calibrate hall effect sensor
-    calibrateSensor( bDebugSerConn, N_CALIBRATION_SAMPLES, HALL_SENSOR_0);
+    if ( bDebugSerConn ) {
+        calibrateSensor( bDebugSerConn, N_CALIBRATION_SAMPLES, HALL_SENSOR_0);
+    } else {
+        sensorThreshold = DEFAULT_SENSOR_THRESHOLD;
+        sensorVariance  = DEFAULT_SENSOR_VARIANCE;
+    }
 
     // OLED media init, and stopscrolling
-    // TODO may need to work on timing
     commandOLED(OLED_SS_TIMEOUT);
-    Serial.println( commandOLED(OLED_MEDIA_INIT) );
     commandOLED(OLED_CLEAR);
+    commandOLED(OLED_MEDIA_INIT);
 
+    debugPrintln("End of setup");
+
+}
+
+/* Set serial status flag 
+ * Handshake to see if connected to computer
+ * Timeout is same amount of time as OLED needs to init
+ * NOTE if(Serial) does not work due to the SofSerial library
+ */
+void serialHandshake() {
+    char buf[1];
+    byte rtn;
+    
+    bDebugSerConn = false;
+    Serial.setTimeout(HANDSHAKE_TIME);
+    Serial.println("Press any key");
+    rtn = Serial.readBytes(buf, 1);
+    
+    bDebugSerConn = true;
+    if (rtn == 0) {
+        /* not connected */
+        bDebugSerConn = false;
+    }
+
+    debugPrintln("Serial online");
+
+    /* serial status pin */
+    pinMode(SER_ENABLE_PIN, OUTPUT);
+    if (bDebugSerConn) {
+        digitalWrite(SER_ENABLE_PIN, LOW);       
+    } else {
+        digitalWrite(SER_ENABLE_PIN, HIGH);
+    }
 }
 
 /* calculate sensor values
@@ -213,10 +259,6 @@ void calibrateSensor(bool bDebugSerConn, int nSamples, int sensorPin) {
     // set defaults, user can choose to override
     sensorThreshold = DEFAULT_SENSOR_THRESHOLD;
     sensorVariance  = DEFAULT_SENSOR_VARIANCE;
-
-    if ( !bDebugSerConn ) {
-        return; // use defaults
-    }
 
     Serial.println("Calibrating Sensor");
 
@@ -274,24 +316,28 @@ void loop() {
     int id;
     bool bIsNewId = true; // TODO reduce noise by checking prior id
 
+    digitalWrite(SER_ENABLE_PIN, HIGH);
+
     magnet_tag_t magnetTag = readMagnetTag();
     id = idTag(magnetTag);
+
     /* if valid id then play animation */
     if ( (0 <= id) && (id < N_ANIMATIONS) ) {
         playAnimation(id, bIsNewId);
     } else {
-        commandOLED(OLED_SET_SECT);
+        commandOLED(OLED_SET_SECT); // set sector 0
         commandOLED(OLED_SET_IMG);
-        //commandOLED(OLED_CLEAR);
     }
 
     /* Debug print */
-    printMagnetPolarity(magnetTag.pole0);
-    printMagnetPolarity(magnetTag.pole1);
-    printMagnetPolarity(magnetTag.pole2);
-    Serial.print(' ');
-    Serial.print(id);
-    Serial.println("; ");
+    if (bDebugSerConn) {
+        printMagnetPolarity(magnetTag.pole0);
+        printMagnetPolarity(magnetTag.pole1);
+        printMagnetPolarity(magnetTag.pole2);
+        Serial.print(' ');
+        Serial.print(id);
+        Serial.println("; ");
+    }
 
 }
 
@@ -423,14 +469,24 @@ bool commandOLED(OLED_cmd_t cmd) {
 }
 
 bool waitAckOLED(bool ackVal) {
-    // TODO this function may block for too long
-    char ack[2];
-    while( !OLED.available() );
+    char ack[3] = "--";
+    int i;
+
+    // exit loop on timeout or if data available
+    for( i = OLED_TIMEOUT; (i > 0) && !OLED.available(); --i ) {};
+
+    // if exited on timeout return error
+    if( i < 0 ) {
+        debugPrintln("OLED timeout");
+        return false;
+    }
+
     if (ackVal) {
         OLED.readBytes(ack, 2);
     } else {
         OLED.readBytes(ack, 1);        
     }
+
     return (OLED_ACK == ack[0]) ;
 }
 
@@ -458,4 +514,10 @@ void printMagnetPolarity(magnet_polarity_t pole) {
     }
 
     Serial.print(poleSym);
+}
+
+void debugPrintln(char* msg) {
+    if (bDebugSerConn) {
+        Serial.println(msg);
+    }
 }
