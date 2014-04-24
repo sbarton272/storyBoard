@@ -147,19 +147,19 @@ OLED_cmd_t OLED_SET_IMG = {
   ====================================================*/
 
 animation_t owlBlink1 = {
-    {0xFF, 0xB8, 0x00, 0x00, 0x01, 0x92},
+    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x00},
     {POLE_NEG, POLE_POS, POLE_POS},
     0
 };
 
 animation_t owlDazed4 = {
-    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x51},
+    {0xFF, 0xB8, 0x00, 0x00, 0x02, 0x82},
     {POLE_POS, POLE_POS, POLE_POS},
     1
 };
 
 animation_t owlCry5 = {
-    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0x51},
+    {0xFF, 0xB8, 0x00, 0x00, 0x00, 0xA1},
     {POLE_NEG, POLE_POS, POLE_NEG},
     2
 };
@@ -325,8 +325,7 @@ void loop() {
     if ( (0 <= id) && (id < N_ANIMATIONS) ) {
         playAnimation(id, bIsNewId);
     } else {
-        commandOLED(OLED_SET_SECT); // set sector 0
-        commandOLED(OLED_SET_IMG);
+        commandOLED(OLED_CLEAR);
     }
 
     /* Debug print */
